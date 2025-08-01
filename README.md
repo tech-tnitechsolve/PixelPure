@@ -36,11 +36,16 @@ PixelPure/
    ```bash
    pip install -r requirements.txt
    ```
-3. **Chạy ứng dụng:**
+3. **Tải model AI (chỉ cần thực hiện 1 lần, khi có mạng):**
+   ```bash
+   python download_model.py
+   ```
+   > Script này sẽ tự động tải và cache model CLIP từ Hugging Face. Sau khi tải xong, bạn có thể sử dụng ứng dụng ở chế độ offline.
+4. **Chạy ứng dụng:**
    ```bash
    python main.py
    ```
-4. Làm theo hướng dẫn trên giao diện.
+5. Làm theo hướng dẫn trên giao diện.
 
 ## Đóng góp & liên hệ
 - Đóng góp qua Pull Request hoặc Issue trên GitHub.

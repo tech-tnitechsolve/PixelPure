@@ -1,34 +1,27 @@
 # -*- coding: utf-8 -*-
 
 """
-config.py (v2)
+config.py (v3)
 Tệp này chứa tất cả các cấu hình và hằng số cho ứng dụng PixelPure.
-Cập nhật để sử dụng hệ thống tính điểm phần trăm và các ngưỡng mới.
+Cập nhật để sử dụng ngưỡng mặc định cho thanh trượt.
 """
 
 # --- Thông tin ứng dụng ---
 APP_NAME = "PixelPure"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 SLOGAN = "Quét sâu, dọn gọn, hiệu quả cao"
 
 # --- Cấu hình Model AI ---
 MODEL_NAME = "openai/clip-vit-base-patch32"
 
 # --- Ngưỡng điểm tương đồng (%) ---
-# Điểm càng cao, độ tương đồng càng lớn.
 # Các file có điểm từ HIGH_SIMILARITY_SCORE trở lên sẽ được coi là trùng lặp cao.
 HIGH_SIMILARITY_SCORE = 95.0
-# Các file có điểm từ SIMILAR_SCORE trở lên sẽ được hiển thị trong kết quả.
-SIMILAR_SCORE_THRESHOLD = 60.0
+# Ngưỡng mặc định cho chế độ quét sâu, có thể được người dùng thay đổi.
+DEFAULT_SIMILAR_SCORE_THRESHOLD = 70.0
 
 # --- Cấu hình cho việc chuyển đổi các giá trị thành điểm ---
-# Giá trị L2 distance tối đa từ model CLIP để chuẩn hóa về thang điểm 0-100.
-# Sau khi thử nghiệm, một khoảng cách > 40 thường là các ảnh rất khác nhau.
 MAX_L2_DISTANCE = 40.0
-
-# Ngưỡng khoảng cách Hamming cho pHash.
-# Khoảng cách <= 5 thường là ảnh giống hệt hoặc chỉ khác biệt rất nhỏ.
-# Hash size là 64 bit.
 PHASH_HAMMING_DISTANCE_THRESHOLD = 5
 
 # --- Các định dạng file được hỗ trợ ---
@@ -49,7 +42,6 @@ OTHER_EXTS = [
 ]
 
 # --- CSS (QSS) cho Giao Diện ---
-# Giữ nguyên stylesheet
 STYLESHEET = """
 QWidget {
     font-family: "Segoe UI", "Arial", "Helvetica", sans-serif;
@@ -134,5 +126,19 @@ QProgressDialog {
 }
 QScrollArea {
     border: none;
+}
+QSlider::groove:horizontal {
+    border: 1px solid #4a5060;
+    height: 8px;
+    background: #3a4050;
+    margin: 2px 0;
+    border-radius: 4px;
+}
+QSlider::handle:horizontal {
+    background: #e0e0e0;
+    border: 1px solid #e0e0e0;
+    width: 18px;
+    margin: -5px 0;
+    border-radius: 9px;
 }
 """

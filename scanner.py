@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-scanner.py (v3)
-Module này chứa logic quét file đa tầng, kết hợp SHA256, pHash, và model CLIP
-để tạo ra một điểm số tương đồng (%).
-Đã sửa lỗi Pylance và tái cấu trúc để cải thiện độ ổn định.
+scanner.py (v5)
+Module này chứa logic quét file đa tầng.
+Cập nhật để nhận và sử dụng ngưỡng tương đồng tùy chỉnh từ giao diện.
 """
 
 import os
@@ -23,23 +22,24 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from transformers import CLIPProcessor, CLIPModel
 
 from config import (
-    MODEL_NAME, MAX_L2_DISTANCE, SIMILAR_SCORE_THRESHOLD,
+    MODEL_NAME, MAX_L2_DISTANCE,
     IMAGE_EXTS, VIDEO_EXTS, PHASH_HAMMING_DISTANCE_THRESHOLD
 )
 
 class ScannerWorker(QObject):
     """
     Worker thực hiện các tác vụ quét nặng trong một luồng riêng.
-    Cập nhật để thực hiện quét sâu đa tầng.
     """
     progress_updated = pyqtSignal(int, str)
     group_found = pyqtSignal(float, list)
     finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, file_list):
+    def __init__(self, file_list, scan_mode, similarity_threshold):
         super().__init__()
         self.file_list = file_list
+        self.scan_mode = scan_mode
+        self.similarity_threshold = similarity_threshold # Lưu ngưỡng tùy chỉnh
         self.is_running = True
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model: CLIPModel | None = None
@@ -52,7 +52,6 @@ class ScannerWorker(QObject):
             return True
         try:
             self.progress_updated.emit(0, "Đang tải mô hình AI...")
-            # SỬA LỖI: Thêm type: ignore để bỏ qua cảnh báo không chính xác từ Pylance
             model_obj = CLIPModel.from_pretrained(MODEL_NAME)
             self.model = model_obj.to(self.device) # type: ignore
             self.processor = CLIPProcessor.from_pretrained(MODEL_NAME)
@@ -66,19 +65,21 @@ class ScannerWorker(QObject):
             return False
 
     def stop(self):
-        """Dừng quá trình quét."""
         self.is_running = False
 
     def run(self):
-        """Hàm chính để bắt đầu quá trình quét sâu đa tầng."""
+        """Hàm chính để bắt đầu quá trình quét dựa trên chế độ đã chọn."""
         try:
             if not self.is_running: return
+            
             self.scan_absolute_duplicates()
             if not self.is_running: return
             self.scan_perceptual_hashes()
             if not self.is_running: return
-            if self._load_model():
-                self.scan_ai_similarity()
+
+            if self.scan_mode == 'deep':
+                if self._load_model():
+                    self.scan_ai_similarity()
         except Exception as e:
             error_msg = (f"Đã xảy ra lỗi không mong muốn trong quá trình quét:\n\n{str(e)}\n\n"
                          f"Chi tiết:\n{traceback.format_exc()}")
@@ -87,7 +88,6 @@ class ScannerWorker(QObject):
             self.finished.emit()
 
     def _get_file_hash(self, filepath, block_size=65536):
-        """Tính toán hash SHA256 của một file."""
         hasher = hashlib.sha256()
         try:
             with open(filepath, 'rb') as f:
@@ -100,7 +100,6 @@ class ScannerWorker(QObject):
             return None
 
     def scan_absolute_duplicates(self):
-        """Tầng 1: Quét các file trùng lặp 100% dựa trên hash SHA256."""
         self.progress_updated.emit(10, "Tầng 1: Tìm file trùng lặp tuyệt đối...")
         hashes_by_size = defaultdict(list)
         for file_path in self.file_list:
@@ -125,7 +124,6 @@ class ScannerWorker(QObject):
                 self.processed_files.update(files)
 
     def scan_perceptual_hashes(self):
-        """Tầng 2: Quét các ảnh gần giống hệt nhau bằng pHash."""
         self.progress_updated.emit(25, "Tầng 2: Phân tích ảnh bằng pHash...")
         image_files = [f for f in self.file_list if f not in self.processed_files and Path(f).suffix.lower() in IMAGE_EXTS]
         if len(image_files) < 2: return
@@ -161,8 +159,6 @@ class ScannerWorker(QObject):
                 local_processed.add(i)
 
     def _get_features_from_image(self, image: Image.Image):
-        """TÁI CẤU TRÚC: Trích xuất vector đặc trưng từ một đối tượng PIL Image."""
-        # SỬA LỖI: Thêm kiểm tra để Pylance không báo lỗi OptionalCall/OptionalMemberAccess
         if not self.model or not self.processor:
             return None
         try:
@@ -175,7 +171,6 @@ class ScannerWorker(QObject):
             return None
 
     def _extract_image_features(self, image_path: str):
-        """TÁI CẤU TRÚC: Mở file ảnh và gọi hàm trích xuất đặc trưng."""
         try:
             with Image.open(image_path).convert("RGB") as image:
                 return self._get_features_from_image(image)
@@ -183,7 +178,6 @@ class ScannerWorker(QObject):
             return None
 
     def _extract_video_features(self, video_path: str):
-        """TÁI CẤU TRÚC: Trích xuất đặc trưng từ video bằng cách xử lý từng frame."""
         try:
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened(): return None
@@ -199,7 +193,6 @@ class ScannerWorker(QObject):
                 if ret:
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     pil_img = Image.fromarray(frame_rgb)
-                    # SỬA LỖI: Gọi hàm đã được tái cấu trúc
                     if (features := self._get_features_from_image(pil_img)) is not None:
                         video_features.append(features)
             
@@ -211,7 +204,6 @@ class ScannerWorker(QObject):
             return None
 
     def _extract_features(self, file_path):
-        """Trích xuất vector đặc trưng từ ảnh hoặc video bằng CLIP."""
         ext = Path(file_path).suffix.lower()
         if ext in IMAGE_EXTS:
             return self._extract_image_features(file_path)
@@ -220,7 +212,6 @@ class ScannerWorker(QObject):
         return None
 
     def scan_ai_similarity(self):
-        """Tầng 3: Quét các file ảnh/video tương tự nhau bằng AI."""
         self.progress_updated.emit(50, "Tầng 3: Phân tích sâu bằng AI...")
         media_files = [f for f in self.file_list if f not in self.processed_files and Path(f).suffix.lower() in IMAGE_EXTS + VIDEO_EXTS]
         if len(media_files) < 2: return
@@ -228,23 +219,21 @@ class ScannerWorker(QObject):
         features_list, path_list = [], []
         for i, file_path in enumerate(media_files):
             if not self.is_running: return
-            self.progress_updated.emit(50 + int((i / len(media_files)) * 25), f"Phân tích AI: {Path(file_path).name}")
+            self.progress_updated.emit(50 + int((i / len(media_files)) * 45), f"Phân tích AI: {Path(file_path).name}")
             if (features := self._extract_features(file_path)) is not None:
                 features_list.append(features)
                 path_list.append(file_path)
 
         if not self.is_running or not features_list: return
 
-        self.progress_updated.emit(75, "Xây dựng chỉ mục tìm kiếm AI...")
+        self.progress_updated.emit(95, "Xây dựng chỉ mục và tìm kiếm AI...")
         features_matrix = np.array(features_list).astype('float32')
         if features_matrix.ndim != 2: return
 
         dimension = features_matrix.shape[1]
         index = faiss.IndexFlatL2(dimension)
-        # SỬA LỖI: Thêm type: ignore cho các lệnh của Faiss
         index.add(features_matrix) # type: ignore
 
-        self.progress_updated.emit(85, "Tìm kiếm các file tương tự bằng AI...")
         local_processed = set()
         num_paths = len(path_list)
         for i in range(num_paths):
@@ -256,7 +245,8 @@ class ScannerWorker(QObject):
             group, scores = [path_list[i]], []
             for j, dist in zip(indices[0], distances[0]):
                 if i == j or j in local_processed: continue
-                if (score := max(0, 100 * (1 - dist / MAX_L2_DISTANCE))) >= SIMILAR_SCORE_THRESHOLD:
+                # SỬ DỤNG NGƯỠNG TÙY CHỈNH
+                if (score := max(0, 100 * (1 - dist / MAX_L2_DISTANCE))) >= self.similarity_threshold:
                     group.append(path_list[j])
                     scores.append(score)
                     local_processed.add(j)

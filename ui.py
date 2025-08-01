@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-ui.py (v5)
+ui.py (v8)
 Module này chứa tất cả các thành phần giao diện người dùng (UI) của ứng dụng.
-Đã sửa các lỗi Pylance liên quan đến ghi đè phương thức và kiểm tra None.
+Cập nhật logic "Nhóm và Di chuyển" để di chuyển toàn bộ file trong nhóm.
 """
 
 import os
@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QPushButton, QLabel, QStackedWidget,
     QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QProgressDialog,
     QGroupBox, QHBoxLayout, QScrollArea, QMessageBox, QRadioButton, QStyle,
-    QSizePolicy
+    QSlider
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QPixmap, QIcon, QDragEnterEvent, QDropEvent
@@ -22,7 +22,7 @@ from send2trash import send2trash
 
 from config import (
     IMAGE_EXTS, VIDEO_EXTS, OTHER_EXTS, SLOGAN, APP_NAME,
-    HIGH_SIMILARITY_SCORE
+    HIGH_SIMILARITY_SCORE, DEFAULT_SIMILAR_SCORE_THRESHOLD
 )
 from scanner import ScannerWorker
 
@@ -53,7 +53,6 @@ class DragDropWidget(QWidget):
         layout.addWidget(sub_text)
 
     def dragEnterEvent(self, a0: QDragEnterEvent | None):
-        """SỬA LỖI: Đổi tên tham số thành 'a0' để tương thích và kiểm tra None."""
         if a0:
             mime_data = a0.mimeData()
             if mime_data and mime_data.hasUrls():
@@ -62,7 +61,6 @@ class DragDropWidget(QWidget):
                 a0.ignore()
 
     def dropEvent(self, a0: QDropEvent | None):
-        """SỬA LỖI: Đổi tên tham số thành 'a0' để tương thích và kiểm tra None."""
         if a0:
             mime_data = a0.mimeData()
             if mime_data and mime_data.hasUrls():
@@ -75,7 +73,7 @@ class DragDropWidget(QWidget):
 
 class FileProcessingWidget(QWidget):
     """Widget hiển thị danh sách file và các tùy chọn quét."""
-    start_scan_signal = pyqtSignal(list)
+    start_scan_signal = pyqtSignal(list, str, int)
     reset_signal = pyqtSignal()
     
     def __init__(self, parent=None):
@@ -134,11 +132,32 @@ class FileProcessingWidget(QWidget):
         stats_layout.addWidget(self.lbl_total_videos)
         stats_layout.addWidget(self.lbl_total_others)
         
-        scan_group = QGroupBox("Tùy Chọn")
+        scan_group = QGroupBox("Chế Độ Quét")
         scan_layout = QVBoxLayout(scan_group)
-        scan_layout.addWidget(QLabel("Chế độ quét sâu sẽ được thực hiện."))
+        self.radio_fast = QRadioButton("Quét nhanh (Trùng lặp cao)")
+        self.radio_deep = QRadioButton("Quét sâu (Tương tự - AI)")
+        self.radio_fast.setToolTip("Chỉ quét các file trùng lặp 100% và các ảnh gần giống hệt nhau. Tốc độ nhanh.")
+        self.radio_deep.setToolTip("Quét toàn bộ, bao gồm cả phân tích nội dung bằng AI. Chậm hơn nhưng tìm được nhiều hơn.")
+        self.radio_fast.setChecked(True)
+        scan_layout.addWidget(self.radio_fast)
+        scan_layout.addWidget(self.radio_deep)
+
+        self.threshold_widget = QWidget()
+        threshold_layout = QHBoxLayout(self.threshold_widget)
+        threshold_layout.setContentsMargins(0, 5, 0, 0)
+        self.slider_threshold = QSlider(Qt.Orientation.Horizontal)
+        self.slider_threshold.setRange(30, 95)
+        self.slider_threshold.setValue(int(DEFAULT_SIMILAR_SCORE_THRESHOLD))
+        self.lbl_threshold_value = QLabel(f"{int(DEFAULT_SIMILAR_SCORE_THRESHOLD)}%")
+        threshold_layout.addWidget(self.slider_threshold)
+        threshold_layout.addWidget(self.lbl_threshold_value)
+        scan_layout.addWidget(self.threshold_widget)
         
-        btn_start = QPushButton("Bắt Đầu Quét Sâu")
+        self.slider_threshold.valueChanged.connect(self.update_threshold_label)
+        self.radio_deep.toggled.connect(self.toggle_threshold_slider)
+        self.toggle_threshold_slider(self.radio_deep.isChecked())
+        
+        btn_start = QPushButton("Bắt Đầu Quét")
         btn_start.setObjectName("StartButton")
         btn_start.clicked.connect(self.start_scan)
         
@@ -154,8 +173,13 @@ class FileProcessingWidget(QWidget):
         main_layout.addWidget(left_panel, 3)
         main_layout.addWidget(right_panel, 1)
 
+    def toggle_threshold_slider(self, checked):
+        self.threshold_widget.setVisible(checked)
+
+    def update_threshold_label(self, value):
+        self.lbl_threshold_value.setText(f"{value}%")
+
     def dragEnterEvent(self, a0: QDragEnterEvent | None):
-        """SỬA LỖI: Đổi tên tham số thành 'a0' để tương thích và kiểm tra None."""
         if a0:
             mime_data = a0.mimeData()
             if mime_data and mime_data.hasUrls():
@@ -164,7 +188,6 @@ class FileProcessingWidget(QWidget):
                 a0.ignore()
 
     def dropEvent(self, a0: QDropEvent | None):
-        """SỬA LỖI: Đổi tên tham số thành 'a0' để tương thích và kiểm tra None."""
         if a0:
             mime_data = a0.mimeData()
             if mime_data and mime_data.hasUrls():
@@ -265,7 +288,9 @@ class FileProcessingWidget(QWidget):
         if not selected_files:
             QMessageBox.warning(self, "Cảnh báo", "Vui lòng chọn ít nhất một file để quét.")
             return
-        self.start_scan_signal.emit(selected_files)
+        scan_mode = 'deep' if self.radio_deep.isChecked() else 'fast'
+        threshold = self.slider_threshold.value()
+        self.start_scan_signal.emit(selected_files, scan_mode, threshold)
 
     def reset(self):
         self.file_list.clear()
@@ -337,6 +362,7 @@ class ResultsWidget(QWidget):
         
         file_widgets = []
         try:
+            # Sắp xếp file theo kích thước để file lớn nhất hiện lên đầu
             sorted_files = sorted(files, key=lambda x: os.path.getsize(x) if os.path.exists(x) else -1, reverse=True)
         except FileNotFoundError:
             sorted_files = files
@@ -346,7 +372,8 @@ class ResultsWidget(QWidget):
             p = Path(file_path)
             file_widget = QWidget()
             file_layout = QHBoxLayout(file_widget)
-            cb = QRadioButton(f"Giữ lại file này")
+            # Chức năng của RadioButton giờ chỉ để chọn file xóa
+            cb = QRadioButton(f"Giữ lại file này (để không xóa)")
             thumb_label = QLabel()
             thumb_label.setFixedSize(80, 80)
             thumb_label.setStyleSheet("border: 1px solid #4a5060; background-color: #23272e; border-radius: 5px;")
@@ -376,6 +403,7 @@ class ResultsWidget(QWidget):
             self.groups[group_id] = file_widgets
 
     def get_files_for_action(self):
+        """Lấy danh sách các file để XÓA (những file không được chọn)."""
         to_action = []
         for group_id, file_widgets in self.groups.items():
             kept_file = next((path for cb, path in file_widgets if cb.isChecked()), None)
@@ -385,6 +413,7 @@ class ResultsWidget(QWidget):
         return to_action
 
     def delete_selected(self):
+        """Xóa các file không được chọn trong mỗi nhóm."""
         files_to_delete = self.get_files_for_action()
         if not files_to_delete:
             QMessageBox.information(self, "Thông báo", "Không có file nào được chọn để xóa.")
@@ -413,33 +442,34 @@ class ResultsWidget(QWidget):
             self.rescan_signal.emit()
 
     def group_and_move_selected(self):
+        """CẬP NHẬT: Di chuyển và đổi tên TOÀN BỘ file trong các nhóm kết quả."""
         dest_folder = QFileDialog.getExistingDirectory(self, "Chọn thư mục đích để nhóm và di chuyển file")
         if not dest_folder: return
 
-        files_to_move = self.get_files_for_action()
-        if not files_to_move:
-            QMessageBox.information(self, "Thông báo", "Không có file nào được chọn để di chuyển.")
+        total_files_to_move = sum(len(widgets) for widgets in self.groups.values())
+        if not total_files_to_move:
+            QMessageBox.information(self, "Thông báo", "Không có file nào trong kết quả để di chuyển.")
             return
         
-        reply = QMessageBox.question(self, "Xác nhận Di Chuyển",
-                                     f"Bạn có chắc muốn di chuyển và đổi tên {len(files_to_move)} file không?",
+        reply = QMessageBox.question(self, "Xác nhận Nhóm và Di chuyển",
+                                     f"Bạn có chắc muốn di chuyển và đổi tên TOÀN BỘ {total_files_to_move} file trong các nhóm không? "
+                                     f"Lựa chọn 'Giữ lại file này' sẽ được bỏ qua cho hành động này.",
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
         if reply != QMessageBox.StandardButton.Yes: return
 
         success_count, errors = 0, []
+        # Lặp qua từng nhóm để xử lý
         for group_idx, (group_id, file_widgets) in enumerate(self.groups.items()):
-            kept_file = next((path for cb, path in file_widgets if cb.isChecked()), None)
-            
             file_counter = 1
+            # Lặp qua TOÀN BỘ file trong nhóm, không quan tâm file nào được chọn
             for cb, path in file_widgets:
-                if path == kept_file: continue
-                
                 original_path = Path(path)
                 try:
                     new_name = f"nhom_{group_idx + 1}({file_counter}){original_path.suffix}"
                     destination_path = os.path.join(dest_folder, new_name)
                     
+                    # Xử lý trường hợp tên file đã tồn tại ở thư mục đích
                     while os.path.exists(destination_path):
                         file_counter += 1
                         new_name = f"nhom_{group_idx + 1}({file_counter}){original_path.suffix}"
@@ -457,6 +487,7 @@ class ResultsWidget(QWidget):
             QMessageBox.warning(self, "Hoàn tất với lỗi", msg)
         else:
             QMessageBox.information(self, "Thành công", msg)
+        
         self.rescan_signal.emit()
 
 
@@ -491,7 +522,7 @@ class MainWindow(QMainWindow):
         self.processing_widget.add_paths(paths)
         self.stacked_widget.setCurrentWidget(self.processing_widget)
 
-    def start_scan(self, file_list):
+    def start_scan(self, file_list, scan_mode, threshold):
         if self.is_scanning:
             QMessageBox.information(self, "Đang xử lý", "Một tiến trình quét đang chạy. Vui lòng đợi hoàn tất.")
             return
@@ -504,7 +535,7 @@ class MainWindow(QMainWindow):
         self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         
         self.worker_thread = QThread()
-        self.worker = ScannerWorker(file_list)
+        self.worker = ScannerWorker(file_list, scan_mode, threshold)
         self.worker.moveToThread(self.worker_thread)
         
         self.worker_thread.started.connect(self.worker.run)

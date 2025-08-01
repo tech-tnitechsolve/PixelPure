@@ -3,29 +3,52 @@
 PixelPure là một dự án Python dùng để xử lý hình ảnh, quét và phân tích các file ảnh.
 
 ## Mục đích
-- Hỗ trợ quét, phân tích và xử lý các file ảnh PNG.
-- Cung cấp giao diện người dùng đơn giản để thao tác với các chức năng xử lý ảnh.
 
 ## Cấu trúc dự án
-- `main.py`: Điểm khởi động chính của ứng dụng.
-- `ui.py`: Xử lý giao diện người dùng.
-- `scanner.py`: Chứa các hàm quét và phân tích ảnh.
-- `config.py`: Cấu hình cho dự án.
-- `download_model.py`: Hỗ trợ tải các mô hình cần thiết (nếu có).
-- `oke/`: Thư mục chứa các file ảnh mẫu.
-- `__pycache__/`: Thư mục cache của Python (có thể bỏ qua).
 
-## Hướng dẫn sử dụng
-1. Cài đặt Python 3.12 hoặc mới hơn.
-2. Cài đặt các thư viện cần thiết (nếu có, hãy thêm requirements.txt).
-3. Chạy ứng dụng bằng lệnh:
+# PixelPure
+
+
+
+## Tính năng nổi bật
+- Quét và phát hiện ảnh trùng lặp hoặc tương tự trong thư mục.
+- Hỗ trợ nhiều định dạng ảnh phổ biến (PNG, JPG, JPEG, BMP, ...).
+- Giao diện người dùng hiện đại, dễ sử dụng với PyQt6.
+- Tùy chọn chế độ quét nhanh hoặc sâu, tối ưu cho từng nhu cầu.
+- Hỗ trợ chọn thiết bị xử lý (CPU, CUDA nếu có).
+- Xem trước ảnh, chọn ảnh giữ lại/xóa, thao tác hàng loạt.
+
+## Cấu trúc dự án
+```
+PixelPure/
+├── main.py              # Điểm khởi động ứng dụng
+├── ui.py                # Giao diện người dùng
+├── scanner.py           # Logic quét và phân tích ảnh
+├── config.py            # Cấu hình chung
+├── download_model.py    # Tải mô hình AI (nếu cần)
+├── requirements.txt     # Thư viện phụ thuộc
+├── oke/                 # Thư mục chứa ảnh mẫu
+└── ...
+```
+
+## Hướng dẫn cài đặt & sử dụng
+1. **Cài đặt Python >= 3.10**
+2. **Cài đặt thư viện:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Chạy ứng dụng:**
    ```bash
    python main.py
    ```
 4. Làm theo hướng dẫn trên giao diện.
 
-## Đóng góp
-Mọi đóng góp đều được hoan nghênh! Hãy tạo pull request hoặc issue nếu bạn muốn đóng góp hoặc báo lỗi.
+## Đóng góp & liên hệ
+- Đóng góp qua Pull Request hoặc Issue trên GitHub.
+- Liên hệ: [TNI Tech Solutions](mailto:info@tnitechsolutions.com)
 
-## Bản quyền
-© 2025 TNI Tech Solutions. Sử dụng cho mục đích học tập và nghiên cứu.
+## License
+MIT License. Xem chi tiết trong file LICENSE nếu có.
+
+---
+© 2025 TNI Tech Solutions. Dành cho mục đích học tập, nghiên cứu và phát triển cộng đồng.

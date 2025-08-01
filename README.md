@@ -27,7 +27,6 @@ PixelPure/
 ├── config.py            # Cấu hình chung
 ├── download_model.py    # Tải mô hình AI (nếu cần)
 ├── requirements.txt     # Thư viện phụ thuộc
-├── oke/                 # Thư mục chứa ảnh mẫu
 └── ...
 ```
 

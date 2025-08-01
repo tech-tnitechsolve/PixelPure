@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-scanner.py (v5)
+scanner.py (v7)
 Module này chứa logic quét file đa tầng.
-Cập nhật để nhận và sử dụng ngưỡng tương đồng tùy chỉnh từ giao diện.
+Đã sửa lỗi import sai tên biến.
 """
 
 import os
@@ -34,28 +34,43 @@ class ScannerWorker(QObject):
     group_found = pyqtSignal(float, list)
     finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
+    device_info = pyqtSignal(str)
 
-    def __init__(self, file_list, scan_mode, similarity_threshold):
+    def __init__(self, file_list, scan_mode, similarity_threshold, processing_device):
         super().__init__()
         self.file_list = file_list
         self.scan_mode = scan_mode
-        self.similarity_threshold = similarity_threshold # Lưu ngưỡng tùy chỉnh
+        self.similarity_threshold = similarity_threshold
+        self.processing_device_setting = processing_device
+        self.device = self._determine_device()
         self.is_running = True
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model: CLIPModel | None = None
         self.processor: CLIPProcessor | None = None
         self.processed_files = set()
+
+    def _determine_device(self):
+        """Xác định thiết bị xử lý dựa trên cài đặt và phần cứng có sẵn."""
+        if self.processing_device_setting == 'cuda':
+            if torch.cuda.is_available():
+                return 'cuda'
+            else:
+                return 'cpu'
+        elif self.processing_device_setting == 'cpu':
+            return 'cpu'
+        else:
+            return "cuda" if torch.cuda.is_available() else "cpu"
 
     def _load_model(self):
         """Tải model và processor của CLIP."""
         if self.model and self.processor:
             return True
         try:
+            self.device_info.emit(f"Đang tải mô hình lên: {self.device.upper()}...")
             self.progress_updated.emit(0, "Đang tải mô hình AI...")
             model_obj = CLIPModel.from_pretrained(MODEL_NAME)
             self.model = model_obj.to(self.device) # type: ignore
             self.processor = CLIPProcessor.from_pretrained(MODEL_NAME)
-            self.progress_updated.emit(5, f"Tải mô hình AI ({MODEL_NAME}) thành công trên {self.device}.")
+            self.progress_updated.emit(5, f"Tải mô hình AI thành công trên {self.device.upper()}.")
             return True
         except Exception as e:
             error_msg = (f"Không thể tải mô hình AI: {e}\n\n"
@@ -63,20 +78,17 @@ class ScannerWorker(QObject):
                          "hoặc chạy file 'download_model.py' để tải model về trước.")
             self.error_occurred.emit(error_msg)
             return False
-
+    
     def stop(self):
         self.is_running = False
 
     def run(self):
-        """Hàm chính để bắt đầu quá trình quét dựa trên chế độ đã chọn."""
         try:
             if not self.is_running: return
-            
             self.scan_absolute_duplicates()
             if not self.is_running: return
             self.scan_perceptual_hashes()
             if not self.is_running: return
-
             if self.scan_mode == 'deep':
                 if self._load_model():
                     self.scan_ai_similarity()
@@ -245,7 +257,6 @@ class ScannerWorker(QObject):
             group, scores = [path_list[i]], []
             for j, dist in zip(indices[0], distances[0]):
                 if i == j or j in local_processed: continue
-                # SỬ DỤNG NGƯỠNG TÙY CHỈNH
                 if (score := max(0, 100 * (1 - dist / MAX_L2_DISTANCE))) >= self.similarity_threshold:
                     group.append(path_list[j])
                     scores.append(score)

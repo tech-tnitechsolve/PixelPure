@@ -1,24 +1,20 @@
 # -*- coding: utf-8 -*-
 
 """
-config.py (v3)
-Tệp này chứa tất cả các cấu hình và hằng số cho ứng dụng PixelPure.
-Cập nhật để sử dụng ngưỡng mặc định cho thanh trượt.
+config.py (v5)
+Tệp này chứa các cấu hình và hằng số cốt lõi cho ứng dụng.
 """
 
 # --- Thông tin ứng dụng ---
 APP_NAME = "PixelPure"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.3.0"
 SLOGAN = "Quét sâu, dọn gọn, hiệu quả cao"
 
 # --- Cấu hình Model AI ---
 MODEL_NAME = "openai/clip-vit-base-patch32"
 
 # --- Ngưỡng điểm tương đồng (%) ---
-# Các file có điểm từ HIGH_SIMILARITY_SCORE trở lên sẽ được coi là trùng lặp cao.
 HIGH_SIMILARITY_SCORE = 95.0
-# Ngưỡng mặc định cho chế độ quét sâu, có thể được người dùng thay đổi.
-DEFAULT_SIMILAR_SCORE_THRESHOLD = 70.0
 
 # --- Cấu hình cho việc chuyển đổi các giá trị thành điểm ---
 MAX_L2_DISTANCE = 40.0

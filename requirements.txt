@@ -1,0 +1,9 @@
+opencv-python
+faiss-cpu
+numpy
+torch
+Pillow
+imagehash
+PyQt6
+transformers
+send2trash

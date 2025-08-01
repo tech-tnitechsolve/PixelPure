@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cấu hình hệ điều hành
+.DS_Store
+Thumbs.db
+
+# Thư mục dữ liệu mẫu
+oke/
+
+# Môi trường ảo
+venv/
+.env/
+
+# File mô hình lớn (nếu có)
+*.pth
+*.pt
+*.onnx
+
+# File log, tạm
+*.log
+*.tmp
+
+# Ignore notebook checkpoint
+.ipynb_checkpoints/
+
+# Ignore các file riêng tư
+secrets.*
+
+# Ignore requirements lock nếu có
+poetry.lock
+Pipfile.lock

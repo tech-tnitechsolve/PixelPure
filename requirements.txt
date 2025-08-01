@@ -7,3 +7,5 @@ imagehash
 PyQt6
 transformers
 send2trash
+psutil
+pynvml
